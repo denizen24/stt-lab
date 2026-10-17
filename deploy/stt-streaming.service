@@ -1,0 +1,27 @@
+# systemd-юнит stt-streaming. Ставится в /etc/systemd/system/, настройки — в /etc/stt-lab/stt-streaming.env:
+#   STT_SHARED_SECRET=…   STT_MAX_STREAMS=4   STT_DECODER=greedy   STT_MODEL_PATH=/srv/stt-lab/src/models/T-one-fp32/model.onnx
+# Слушает только 127.0.0.1: наружу его выпускает обратный прокси или приватная сеть.
+# CPUQuota=400% на 6 vCPU оставляет два ядра другим процессам машины.
+[Unit]
+Description=stt-streaming — онлайн-транскрибация (T-one)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/srv/stt-lab/src
+EnvironmentFile=-/etc/stt-lab/stt-streaming.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/srv/stt-lab/.venv/bin/uvicorn service.app:main --factory --host 127.0.0.1 --port 8090 --ws-max-size 1048576
+Restart=on-failure
+RestartSec=5
+CPUQuota=400%
+MemoryMax=9G
+Nice=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/srv/stt-lab /root/.cache/huggingface
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

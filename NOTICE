@@ -1,0 +1,6 @@
+stt-lab
+Copyright (c) 2026 Denis Vladimirov. Код распространяется по лицензии MIT (см. LICENSE).
+
+Тексты в results/quality/tone-* получены распознаванием демо-аудио из репозитория
+T-one (https://github.com/voicekit-team/T-one, tone/demo/audio_examples),
+Copyright 2025 T-Software DC, Apache License 2.0. Само аудио в репозиторий не входит.

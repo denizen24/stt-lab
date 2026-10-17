@@ -1,0 +1,12 @@
+tone @ git+https://github.com/voicekit-team/T-one@main
+numpy<2
+onnxruntime>=1.20
+fastapi>=0.110
+uvicorn[standard]>=0.29
+psutil
+soundfile
+huggingface-hub
+# клиент и тесты
+httpx
+websockets>=12
+pytest

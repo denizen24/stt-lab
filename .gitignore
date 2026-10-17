@@ -1,0 +1,28 @@
+# Записи сессий и любые аудио — никогда в git
+samples/
+*.wav
+*.webm
+*.m4a
+*.mp3
+*.flac
+# Веса моделей
+models/
+*.onnx
+*.bin
+*.safetensors
+# Секреты
+.env
+*.env
+!.env.example
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+# Служебное
+results/raw/
+.DS_Store
+results/quality/*
+!results/quality/tone-*
+!samples/ref/
+docs/
