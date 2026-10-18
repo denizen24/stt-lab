@@ -20,6 +20,7 @@ import jiwer
 ROOT = Path(__file__).resolve().parent.parent
 WORD = re.compile(r"[^0-9a-zа-я ]+")
 DIGITS = re.compile(r"\d+")
+ORDINAL = re.compile(r"(\d+)-([а-я]{1,3})\b")  # «1-ый», «2-ой», «0-ой»: так пишет порядковые Deepgram
 
 try:
     from num2words import num2words
@@ -32,6 +33,15 @@ def _digits_to_words(m: re.Match) -> str:
     return num2words(n, lang="ru") if num2words and n < 10**12 else m.group(0)
 
 
+def _ordinal_to_words(m: re.Match) -> str:
+    """«1-ому» → «первому»: порядковое из num2words без окончания плюс наращение из текста."""
+    n, suffix = int(m.group(1)), m.group(2)
+    if not num2words or n >= 10**6:
+        return m.group(0)
+    word = "нулевой" if n == 0 else num2words(n, lang="ru", to="ordinal")
+    return word[:-2] + suffix if len(suffix) >= 2 else word
+
+
 def normalize(text: str) -> str:
     """Строчные, ё → е, числа прописью, только буквы, цифры и пробелы.
 
@@ -39,6 +49,7 @@ def normalize(text: str) -> str:
     без перевода чисел в слова это считалось бы ошибкой распознавания.
     """
     text = text.lower().replace("ё", "е")
+    text = ORDINAL.sub(_ordinal_to_words, text)
     text = DIGITS.sub(_digits_to_words, text)
     text = WORD.sub(" ", text)
     return re.sub(r"\s+", " ", text).strip()

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Приводит аудио к формату модели: моно, 16 бит, 8 кГц, wav → samples/<имя>.8k.wav
+# RATE=16000 — то же на 16 кГц (samples/<имя>.16k.wav): полная полоса для пакетных моделей.
 # Без аргументов берёт образцы из самого пакета T-one (они уже в составе установки).
 #
 #   bash bench/prepare_samples.sh                 # образцы T-one
@@ -12,11 +13,13 @@ if [ -z "${PY:-}" ]; then
   done
 fi
 mkdir -p samples
+RATE=${RATE:-8000}
+SUF=$((RATE / 1000))k
 
 convert() {  # вход, имя выхода, (опц.) карта каналов
   local src=$1 name=$2 map=${3:-}
-  ffmpeg -hide_banner -loglevel error -y -i "$src" ${map:+-map_channel $map} -ac 1 -ar 8000 -sample_fmt s16 "samples/$name.8k.wav"
-  echo "samples/$name.8k.wav  $(ffprobe -v error -show_entries format=duration -of csv=p=0 "samples/$name.8k.wav" | cut -c1-6) с"
+  ffmpeg -hide_banner -loglevel error -y -i "$src" ${map:+-map_channel $map} -ac 1 -ar "$RATE" -sample_fmt s16 "samples/$name.$SUF.wav"
+  echo "samples/$name.$SUF.wav  $(ffprobe -v error -show_entries format=duration -of csv=p=0 "samples/$name.$SUF.wav" | cut -c1-6) с"
 }
 
 if [ $# -eq 0 ]; then
