@@ -1,29 +1,47 @@
 # Качество: как считаем и как вычитываем
 
+Установка окружений и полные команды прогонов обеих частей — в корневом [`README.md`](../README.md):
+[«Повторить первую часть»](../README.md#повторить-первую-часть) и
+[«Повторить вторую часть»](../README.md#повторить-вторую-часть). Здесь — что где лежит, как считаются
+метрики и как вычитывать эталон. Команды ниже — из корня клона, `PY=/srv/stt-lab/.venv/bin/python`.
+
+## Скрипты
+
+- `score.py` — WER/CER по единой нормализации (ниже): `--ref/--hyp` для пары или `--table <каталог>`.
+- `metrics.py` — сверх WER: WERx (по звучанию), числа, термины, F1 пунктуации (`--table`);
+  черновик → чистовик (`--draft-final ЗАПИСЬ ЧЕРНОВИК ЧИСТОВИК`).
+- Раннеры, каждый пишет `results/quality/<имя>.<метка>.txt`:
+  `run_tone.py` (T-one, `--decoder greedy|kenlm`), `run_gigaam.py` (GigaAM-v3 на torch),
+  `run_onnxasr.py` (GigaAM-v3 и Parakeet v3 через onnx-asr, fp32/int8), `run_vosk.py`, `run_deepgram.py`.
+- `refs_from_segments.py` — эталон по дорожкам из общего JSON с сегментами.
+- `cascade.py` — каскад правок: чистовик GigaAM, латиница из Parakeet.
+- `dict_fix.py` — личный словарь поверх чистовика, без второй модели.
+- `diff_review.py`, `sample_review.py` — списки спорных мест для вычитки.
+- `requirements.txt` — `jiwer`, `num2words`.
+
 ## Файлы
 
-- `samples/<запись>.{host,client}.8k.wav` — дорожки, моно 8 кГц (`bench/prepare_samples.sh` из стерео).
-- `samples/ref/<запись>.{host,client}.txt` — эталон по дорожкам. В `samples/ref/README.md`
-  обязательно написано, вычитка это или псевдоэталон (чей текст взят за основу).
-- `results/quality/<запись>.<роль>.<движок>.txt` — сплошной текст от каждого движка;
-  рядом `.phrases.txt` с таймкодами, где движок их отдаёт.
+- `samples/<запись>.{host,client}.8k.wav` — дорожки, моно 8 кГц (`bench/prepare_samples.sh` из стерео);
+  `.16k.wav` — то же в 16 кГц (`RATE=16000 bash bench/prepare_samples.sh …`) для пакетных моделей.
+- `samples/ref/<запись>.{host,client}.txt` — эталон по дорожкам: вручную или `refs_from_segments.py`
+  из JSON с сегментами. В `samples/ref/README.md` обязательно написано, вычитка это или псевдоэталон
+  (чей текст взят за основу). `samples/` в git не входит.
+- `samples/ref/<запись>.<роль>.terms.txt` — необязательный список терминов для `metrics.py`
+  (слово или фраза в строке, `#` — комментарий).
+- `results/quality/<запись>.<роль>.<движок>.txt` — сплошной текст от каждого движка; рядом
+  `.phrases.txt` с таймкодами, где движок их отдаёт, и `.segments.jsonl` у `run_onnxasr.py`
+  (куски с границами — по ним `cascade.py` сопоставляет модели).
+- `results/quality/<запись>.<роль>.cascade[-any][-dict].txt`, `.dictfix.txt` — тексты после каскада и
+  словаря, рядом `.log` со списком замен. `score.py` и `metrics.py --table` подхватывают их как движки
+  `cascade`, `dictfix` и т. д.
 - `results/quality/<запись>.<роль>.review.md` — список спорных мест для вычитки.
 
-## Прогон
+## Вычитка по списку спорных мест
 
 ```bash
-bash bench/prepare_samples.sh samples/raw/запись.mp3          # стерео → host/client 8 кГц
-nohup bash bench/run_quality_set.sh запись > results/raw/quality-запись.log 2>&1 &
-#   A. сервис в реальном времени (задержки)  B. T-one greedy и KenLM офлайн
-#   C. GigaAM-v3 e2e  D. Vosk ru-0.42        — часа три на 30 минут аудио на слабом CPU
-python quality/score.py --table results/quality                 # WER/CER по всем парам
-python quality/diff_review.py --name запись.client --engines tone-kenlm gigaam-v3_e2e_rnnt vosk-ru-0.42
+$PY quality/score.py --table results/quality                 # WER/CER по всем парам
+$PY quality/diff_review.py --name запись.client --engines tone-kenlm gigaam-v3_e2e_rnnt vosk-ru-0.42
 ```
-
-Deepgram: `quality/run_deepgram.py` (ключ в `.env`), либо готовый текст из своей системы,
-если запись уже расшифрована там.
-
-## Вычитка по списку спорных мест
 
 Полностью расшифровывать запись не нужно. `review.md` перечисляет только места, где
 хотя бы один движок разошёлся с эталоном, с таймкодом, контекстом и вариантами:
@@ -41,13 +59,23 @@ Deepgram: `quality/run_deepgram.py` (ключ в `.env`), либо готовы�
 («вычитано тем-то, тогда-то, по списку от такой-то даты») и пересчитать:
 
 ```bash
-python quality/score.py --table results/quality
-python quality/diff_review.py --name запись.host   --engines …   # должен похудеть
+$PY quality/score.py --table results/quality
+$PY quality/diff_review.py --name запись.host --engines …     # должен похудеть
 ```
+
+Вместо полной вычитки можно проверить случайную выборку на слух:
+`$PY quality/sample_review.py --record запись --roles host client --engines … --per-role 20 --seed 1`
+→ `results/quality/<запись>.sample.md`; доля мест, где ошибся эталон, даёт поправку к WER.
 
 ## Нормализация
 
-Перед сравнением оба текста: строчные, ё → е, числа прописью (`num2words`), только
-буквы и пробелы. Пунктуация и регистр не оцениваются. Валюта и единицы («₽», «%»)
-пока выбрасываются — если движок пишет «90 ₽», а человек говорит «девяносто рублей»,
-слово «рублей» засчитается пропуском; это известная погрешность в пользу потоковых моделей.
+Перед сравнением оба текста: строчные, ё → е, порядковые с наращением («1-ый», «2-ой») → слова
+(«первый», «второй»), остальные числа прописью (`num2words`), дальше только буквы и пробелы.
+Без `num2words` цифры остаются цифрами — WER будет другим, поэтому ставьте `quality/requirements.txt`.
+Валюта и единицы («₽», «%») пока выбрасываются — если движок пишет «90 ₽», а человек говорит
+«девяносто рублей», слово «рублей» засчитается пропуском; это известная погрешность в пользу
+потоковых моделей.
+
+`score.py` пунктуацию и регистр не оценивает. `metrics.py` берёт ту же нормализацию для слов, а
+пунктуацию оценивает отдельно (F1 конца фразы и запятой на верно распознанных словах); WERx перед
+сравнением сводит латиницу к кириллическому ключу по звучанию.

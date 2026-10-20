@@ -9,7 +9,7 @@
 Спорные пометки эталона `[?вариант1/вариант2]` заменяются первым вариантом,
 `[неразборчиво]` выбрасывается — число тех и других печатается.
 
-    python quality/refs_from_segments.py эталон.json call-a [--offset 0]
+    python quality/refs_from_segments.py эталон.json call-a [--margin 6] [--host-speaker Имя]
     → samples/ref/call-a.host.txt, samples/ref/call-a.client.txt
 """
 import argparse
