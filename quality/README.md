@@ -12,7 +12,8 @@
   черновик → чистовик (`--draft-final ЗАПИСЬ ЧЕРНОВИК ЧИСТОВИК`).
 - Раннеры, каждый пишет `results/quality/<имя>.<метка>.txt`:
   `run_tone.py` (T-one, `--decoder greedy|kenlm`), `run_gigaam.py` (GigaAM-v3 на torch),
-  `run_onnxasr.py` (GigaAM-v3 и Parakeet v3 через onnx-asr, fp32/int8), `run_vosk.py`, `run_deepgram.py`.
+  `run_onnxasr.py` (GigaAM-v3 и Parakeet v3 через onnx-asr, fp32/int8; venv и Parakeet ставит
+  [`deploy/install-onnxasr.sh`](../deploy/install-onnxasr.sh)), `run_vosk.py`, `run_deepgram.py`.
 - `refs_from_segments.py` — эталон по дорожкам из общего JSON с сегментами.
 - `cascade.py` — каскад правок: чистовик GigaAM, латиница из Parakeet.
 - `dict_fix.py` — личный словарь поверх чистовика, без второй модели.

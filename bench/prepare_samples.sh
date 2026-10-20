@@ -16,9 +16,12 @@ mkdir -p samples
 RATE=${RATE:-8000}
 SUF=$((RATE / 1000))k
 
-convert() {  # вход, имя выхода, (опц.) карта каналов
-  local src=$1 name=$2 map=${3:-}
-  ffmpeg -hide_banner -loglevel error -y -i "$src" ${map:+-map_channel $map} -ac 1 -ar "$RATE" -sample_fmt s16 "samples/$name.$SUF.wav"
+convert() {  # вход, имя выхода, (опц.) номер канала: 0 — левый, 1 — правый
+  local src=$1 name=$2 ch=${3:-}
+  # Канал выбирается фильтром pan, а не -map_channel: её убрали в ffmpeg 7, pan есть и в 4.4/6.1.
+  local af=()
+  if [ -n "$ch" ]; then af=(-af "pan=mono|c0=c$ch"); fi
+  ffmpeg -hide_banner -loglevel error -y -i "$src" ${af[@]+"${af[@]}"} -ac 1 -ar "$RATE" -sample_fmt s16 "samples/$name.$SUF.wav"
   echo "samples/$name.$SUF.wav  $(ffprobe -v error -show_entries format=duration -of csv=p=0 "samples/$name.$SUF.wav" | cut -c1-6) с"
 }
 
@@ -34,7 +37,7 @@ for f in "$@"; do
   ch=$(ffprobe -v error -select_streams a:0 -show_entries stream=channels -of csv=p=0 "$f")
   if [ "$ch" -ge 2 ]; then
     # Две дорожки: ведущий в левом канале, клиент в правом.
-    convert "$f" "$base.host" 0.0.0 && convert "$f" "$base.client" 0.0.1
+    convert "$f" "$base.host" 0 && convert "$f" "$base.client" 1
   else
     convert "$f" "$base"
   fi

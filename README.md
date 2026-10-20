@@ -36,7 +36,8 @@
   48 → 8 кГц, лимит дорожек, `finalize`, `/metrics`. `client_demo.py` — пробный клиент из двух файлов.
   Контракт описан в заголовке `service/app.py`.
 - `deploy/` — `install-node.sh` (пакеты, venv, веса T-one), `install-extras.sh` (GigaAM и Vosk в своих
-  venv), `sync-node.sh`, systemd-юнит с CPUQuota, Dockerfile.
+  venv), `install-onnxasr.sh` (onnx-asr и Parakeet для второй части), `sync-node.sh`, systemd-юнит
+  с CPUQuota, Dockerfile.
 - `results/` — таблицы прогонов: `bench-<хост>.csv` (скорость T-one), `batch-<хост>.csv` (пакетные
   прогоны onnx-asr), `env-<хост>.md` (машина), `notes-<хост>.md` (журнал находок), графики.
 - `samples/` — аудио и эталоны (`samples/ref/`); в git не попадают вовсе.
@@ -59,7 +60,7 @@ curl -LO https://raw.githubusercontent.com/voicekit-team/T-one/main/tone/demo/au
 
 ### Установка стенда
 
-Нужны Ubuntu, root, Python 3.10–3.12 и ffmpeg из пакетов Ubuntu (см. примечание про ffmpeg ниже).
+Нужны Ubuntu, root, Python 3.10–3.12 и ffmpeg (ставит `install-node.sh`).
 Окружения ставятся в `/srv/stt-lab` (другой каталог — переменная `STT_LAB_ROOT`; `run_batch_set.sh` и
 `run_curve.sh` вместо неё берут путь к Python из `PY`), команды ниже выполняются из корня клона.
 
@@ -79,17 +80,13 @@ mkdir -p results/raw samples/ref                     # журналы серий
 
 ```bash
 bash deploy/install-extras.sh                        # GigaAM-v3 (torch, .venv-gigaam) и Vosk (.venv-vosk + модели)
-# только для второй части — onnx-asr (GigaAM-v3 и Parakeet через onnxruntime):
-python3 -m venv /srv/stt-lab/.venv-onnxasr
-/srv/stt-lab/.venv-onnxasr/bin/pip install "onnx-asr[cpu,hub]" soundfile psutil
-/srv/stt-lab/.venv-onnxasr/bin/python -c "from huggingface_hub import snapshot_download; \
-  snapshot_download('istupakov/parakeet-tdt-0.6b-v3-onnx', local_dir='models/onnx/parakeet-v3')"
+bash deploy/install-onnxasr.sh                       # часть 2: onnx-asr (.venv-onnxasr) и Parakeet, около 3 ГБ
 ```
 
-GigaAM-v3 для onnx-asr скачивается в кэш Hugging Face сам при первом запуске. Parakeet кладётся в
-`models/onnx/parakeet-v3` (каталог по умолчанию у серийных скриптов, переменная `PARAKEET`):
-onnxruntime ≥ 1.24 не читает внешние веса fp32 (`.onnx.data`) через симлинки кэша, поэтому Parakeet
-передаётся через `--path`.
+[`deploy/install-onnxasr.sh`](deploy/install-onnxasr.sh) создаёт `/srv/stt-lab/.venv-onnxasr` и скачивает
+Parakeet TDT 0.6B v3 в `models/onnx/parakeet-v3` — туда, где его ждут серийные скрипты (другой каталог —
+переменная `PARAKEET`, `venv` первым аргументом — без модели). Повторный запуск безопасен. GigaAM-v3 для
+onnx-asr скачивается в кэш Hugging Face сам при первом запуске; Parakeet передаётся через `--path`.
 
 ### Подготовка сэмплов
 
@@ -106,9 +103,6 @@ RATE=16000 bash bench/prepare_samples.sh samples/raw/запись.webm   # то 
 - `RATE=16000` — полная полоса для пакетных моделей второй части; без `RATE` — 8 кГц, как видит T-one.
 - Общая дорожка `mix` (обе стороны вместе) для `bench/run_etalon_set.sh` — это моно-файл с `.mix` в имени:
   `ffmpeg -i запись.webm -ac 1 samples/raw/запись.mix.wav`, затем `prepare_samples.sh` с ним (8 и 16 кГц).
-- **ffmpeg:** разбор стерео идёт через `-map_channel`, которую убрали в ffmpeg 7. С ffmpeg из Ubuntu
-  22.04/24.04 (4.4/6.1) всё работает; на ffmpeg 7+ разбор стерео падает с `Unrecognized option
-  'map_channel'` (моно и образцы T-one — без проблем).
 
 ## Повторить первую часть
 
@@ -187,7 +181,7 @@ $PY quality/sample_review.py --record запись --roles host client --engines
 
 ## Повторить вторую часть
 
-Окружения — из [установки](#установка-стенда), включая `.venv-onnxasr` и Parakeet в `models/onnx/parakeet-v3`.
+Окружения — из [установки](#установка-стенда), включая `deploy/install-onnxasr.sh` (onnx-asr и Parakeet).
 Дорожки нужны в двух частотах: `samples/<имя>.<дорожка>.8k.wav` (черновик T-one) и `.16k.wav` (чистовик).
 Серийные скрипты ждут, пока на машине нет живого звонка: если у coturn есть релейные сокеты и трафик
 выше `BUSY_KBPS` (по умолчанию 50 КБ/с), прогон откладывается на 5 минут. На машине без coturn они
