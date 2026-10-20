@@ -70,7 +70,7 @@ def main() -> None:
     RAW.mkdir(parents=True, exist_ok=True)
     for f in args.files:
         body = transcribe(f, args.model, key, args.language)
-        name = f.name.replace(".8k.wav", "").replace(".wav", "")
+        name = f.name.replace(".8k.wav", "").replace(".16k.wav", "").replace(".wav", "")
         (RAW / f"{name}.deepgram-{args.model}.json").write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
         channels = body["results"]["channels"]
         for i, ch in enumerate(channels):
